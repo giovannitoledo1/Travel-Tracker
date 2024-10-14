@@ -10,7 +10,7 @@ const port = 3000;
 
 // Dynamically switch between localhost and server IP
 // You must set the environment variable in the console.
-// Example: set NODE_ENV=production
+// Example: command line: set NODE_ENV=production poweshell: $env:NODE_ENV="development"
 
 const dbHost =
   process.env.NODE_ENV === "development"
@@ -54,7 +54,51 @@ app.get("/", async (req, res) => {
   console.log("Visited Countries: ", visitedCountries.rows);
 
   res.render("index.ejs", { countries: countries, total: countries.length });
+  // db.end();
+});
+
+// handle submissions from index.js
+app.post("/add", async (req, res) => {
+  const countryName = req.body["country"];
+  console.log("Country Name: ", countryName);
+  try {
+    const lookupResult = await db.query(
+      "SELECT country_code FROM world_countries WHERE country_name = $1",
+      [countryName]
+    );
+
+    if (lookupResult.rows.length != 0) {
+      const data = lookupResult.rows[0];
+      const countryCode = data.country_code;
+
+      const visitedCheck = await db.query(
+        "SELECT * FROM visited_countries WHERE country_code = $1",
+        [countryCode]
+      );
+
+      if (visitedCheck.rows.length === 0) {
+        await db.query(
+          "INSERT INTO visited_countries (country_code) VALUES ($1)",
+          [countryCode]
+        );
+        res.redirect("/");
+      } else {
+        res.send("This country has already been added to your visited list.");
+      }
+    } else {
+      res.send("Country not found in the database.");
+    }
+  } catch (err) {
+    console.log("Error inserting data: ", err);
+    res.send("An error occured while adding the coutry.");
+  }
+});
+
+// Close the database connection only when the server is shutting down (optional)
+process.on("SIGINT", () => {
+  console.log("Closing database connection");
   db.end();
+  process.exit();
 });
 
 app.listen(port, () => {

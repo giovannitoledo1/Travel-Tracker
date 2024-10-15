@@ -10,7 +10,7 @@ const port = 3000;
 
 // Dynamically switch between localhost and server IP
 // You must set the environment variable in the console.
-// Example: command line: set NODE_ENV=production poweshell: $env:NODE_ENV="development"
+// Example: command line: set NODE_ENV=production powershell: $env:NODE_ENV="development"
 
 const dbHost =
   process.env.NODE_ENV === "development"
@@ -63,8 +63,8 @@ app.post("/add", async (req, res) => {
   console.log("Country Name: ", countryName);
   try {
     const lookupResult = await db.query(
-      "SELECT country_code FROM world_countries WHERE country_name = $1",
-      [countryName]
+      "SELECT country_code FROM world_countries WHERE country_name ~*  $1;",
+      [`\\m${countryName}\\M`]
     );
 
     if (lookupResult.rows.length != 0) {
@@ -83,14 +83,26 @@ app.post("/add", async (req, res) => {
         );
         res.redirect("/");
       } else {
-        res.send("This country has already been added to your visited list.");
+        const vistedCountries = await getVisitedCountries();
+        let countries = vistedCountries.rows.map((row) => row.country_code);
+        res.render("index.ejs", {
+          countries: countries,
+          total: countries.length,
+          error: "This country has already been added to your visited list.",
+        });
       }
     } else {
-      res.send("Country not found in the database.");
+      const visitedCountries = await getVisitedCountries();
+      let countries = visitedCountries.rows.map((row) => row.country_code);
+      res.render("index.ejs", {
+        countries: countries,
+        total: countries.length,
+        error: "Country name does not exist, try again.",
+      });
     }
   } catch (err) {
     console.log("Error inserting data: ", err);
-    res.send("An error occured while adding the coutry.");
+    res.render("An error occured while adding the coutry.");
   }
 });
 
